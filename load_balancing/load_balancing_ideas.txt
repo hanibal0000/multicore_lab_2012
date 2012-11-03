@@ -1,0 +1,10 @@
+## Collection of balancing ideas ##
+
+1. define a specific multiple of #threads. (e.g.: 16 for 4 threads). Start with half of the threads from the bottom and half from the top, working through the areas. Load balancing happens by forcing all threads to work in all areas once. The critical part is to define the number of partitions in order to find a good balance between syncing overhead and load difference in different areas.
+
+2. divide picture through #threads. If one is finished steal work from one that is still working. 
+    Critical: 
+        - how much work to steel? The more often we steal from one thread, the less we steel?
+        - might not be possible to implement with barriers!
+
+3. ...
