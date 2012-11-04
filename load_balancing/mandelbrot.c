@@ -21,6 +21,10 @@
 #include <pthread.h>
 #endif
 
+#if LOADBALANCE == 1
+#include <math.h>
+#endif
+
 int * color = NULL;
 
 #if NB_THREADS > 0
@@ -38,6 +42,17 @@ pthread_barrier_t thread_pool_barrier;
 
 pthread_t thread[NB_THREADS];
 struct mandelbrot_thread thread_data[NB_THREADS];
+
+/*** altered ***/
+#if LOADBALANCE == 1
+// granularity of tasks per thread
+#define NB_TASKS 4
+//array storing for every thread which chunk he is currently up to compute
+//this gets increased by every thread on its own once finished with the old chunk
+int task_count[NB_THREADS];
+
+#endif
+
 #else
 #ifdef MEASURE
 struct mandelbrot_timing sequential;
@@ -86,15 +101,30 @@ is_in_Mandelbrot(float Cre, float Cim, int maxiter)
 }
 
 /***** You may modify this portion *****/
+#if LOADBALANCE == 1
+static void
+compute_chunk(struct mandelbrot_thread *thrd, struct mandelbrot_param *args)
+#else
 static void
 compute_chunk(struct mandelbrot_param *args)
+#endif
 {
 	int i, j, val;
 	float Cim, Cre;
 	color_t pixel;
-
-	for (i = 0; i < args->height; i++)
+#if LOADBALANCE == 1
+    int chunk_height = ceil((double)args->height / (double)(NB_THREADS * NB_TASKS));
+    printf("computed picture height: %i * %i = %i, %i", chunk_height, NB_THREADS * NB_TASKS, chunk_height * NB_THREADS * NB_TASKS, args->height);
+    //where to start = partitions computed by previous rounds + my position in this partition
+    int start = (NB_THREADS * task_count[thrd->id] * chunk_height ) + (thrd->id * chunk_height);
+    int end = start + chunk_height;
+    printf("[Thread: %i]{chunk: %i} start: %i, end %ii\n", thrd->id, task_count[thrd->id], start, end);
+	for (i = start; i < (end < args->height ? end : args->height) ; i++)
 	{
+#else
+    for(i=0; i < args->height; i++)
+    {
+#endif
 		for (j = 0; j < args->width; j++)
 		{
 			// Convert the coordinate of the pixel to be calculated to both
@@ -132,10 +162,17 @@ init_round()
 void
 parallel_mandelbrot(struct mandelbrot_thread *args, struct mandelbrot_param *parameters)
 {
+#if LOADBALANCE == 0
 	if (args->id == 0)
 	{
 		compute_chunk(parameters);
 	}
+#elif LOADBALANCE == 1
+    for(task_count[args->id] = 0; task_count[args->id] < NB_TASKS; task_count[args->id]++)
+    {
+        compute_chunk(args, parameters);
+    }
+#endif
 }
 #else
 void
