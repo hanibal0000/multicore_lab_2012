@@ -21,6 +21,10 @@
 #include <pthread.h>
 #endif
 
+#if LOADBALANCE == 1
+#include <math.h>
+#endif
+
 int * color = NULL;
 
 #if NB_THREADS > 0
@@ -38,6 +42,15 @@ pthread_barrier_t thread_pool_barrier;
 
 pthread_t thread[NB_THREADS];
 struct mandelbrot_thread thread_data[NB_THREADS];
+
+/*** altered ***/
+#if LOADBALANCE == 1
+
+#define NB_TASKS 4
+int round_count;
+
+#endif
+
 #else
 #ifdef MEASURE
 struct mandelbrot_timing sequential;
@@ -86,15 +99,30 @@ is_in_Mandelbrot(float Cre, float Cim, int maxiter)
 }
 
 /***** You may modify this portion *****/
+#if NB_THREADS > 0
+static void
+compute_chunk(struct mandelbrot_thread *thread, struct mandelbrot_param *args)
+#else
 static void
 compute_chunk(struct mandelbrot_param *args)
+#endif
 {
 	int i, j, val;
 	float Cim, Cre;
 	color_t pixel;
+#if NB_THREADS > 0
+#if LOADBALANCE == 1
+    int chunk_height = ceil(args->height / (NB_THREADS * NB_TASKS));
+    int start = (thread->id + 1) * round_count * chunk_height;
+    int end = start + chunk_height;
 
-	for (i = 0; i < args->height; i++)
+	for (i = start; i < (end < args->height ? end : args->height) ; i++)
 	{
+#endif
+#else
+    for(i=0; i < args->height; i++)
+    {
+#endif
 		for (j = 0; j < args->width; j++)
 		{
 			// Convert the coordinate of the pixel to be calculated to both
@@ -126,16 +154,23 @@ void
 init_round()
 {
 	// Initialize or reinitialize here variables before any thread starts or restarts computation
+#if LOADBALANCE == 1
+    round_count++;
+#endif
 }
 
 #if NB_THREADS > 0
 void
 parallel_mandelbrot(struct mandelbrot_thread *args, struct mandelbrot_param *parameters)
 {
+#if LOADBALANCE == 0
 	if (args->id == 0)
 	{
 		compute_chunk(parameters);
 	}
+#elif LOADBALANCE == 1
+    compute_chunk(args, parameters);
+#endif
 }
 #else
 void
@@ -271,6 +306,11 @@ init_mandelbrot(struct mandelbrot_param *param)
 
 	// Enables thread running
 	thread_stop = 0;
+
+/*** self defined ***/
+#if LOADBALANCE == 1
+    round_count = -1;
+#endif
 
 #ifdef MEASURE
 	// Measuring record structures
