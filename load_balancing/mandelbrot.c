@@ -99,7 +99,7 @@ is_in_Mandelbrot(float Cre, float Cim, int maxiter)
 }
 
 /***** You may modify this portion *****/
-#if NB_THREADS > 0
+#if LOADBALANCE == 1
 static void
 compute_chunk(struct mandelbrot_thread *thread, struct mandelbrot_param *args)
 #else
@@ -110,7 +110,6 @@ compute_chunk(struct mandelbrot_param *args)
 	int i, j, val;
 	float Cim, Cre;
 	color_t pixel;
-#if NB_THREADS > 0
 #if LOADBALANCE == 1
     int chunk_height = ceil(args->height / (NB_THREADS * NB_TASKS));
     int start = (thread->id + 1) * round_count * chunk_height;
@@ -118,7 +117,6 @@ compute_chunk(struct mandelbrot_param *args)
 
 	for (i = start; i < (end < args->height ? end : args->height) ; i++)
 	{
-#endif
 #else
     for(i=0; i < args->height; i++)
     {
