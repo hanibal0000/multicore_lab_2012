@@ -47,7 +47,9 @@ struct mandelbrot_thread thread_data[NB_THREADS];
 #if LOADBALANCE == 1
 // granularity of tasks per thread
 #define NB_TASKS 4
-int round_count;
+//array storing for every thread which chunk he is currently up to compute
+//this gets increased by every thread on its own once finished with the old chunk
+int task_count[NB_THREADS];
 
 #endif
 
@@ -101,7 +103,7 @@ is_in_Mandelbrot(float Cre, float Cim, int maxiter)
 /***** You may modify this portion *****/
 #if LOADBALANCE == 1
 static void
-compute_chunk(struct mandelbrot_thread *thread, struct mandelbrot_param *args)
+compute_chunk(struct mandelbrot_thread *thrd, struct mandelbrot_param *args)
 #else
 static void
 compute_chunk(struct mandelbrot_param *args)
@@ -113,7 +115,7 @@ compute_chunk(struct mandelbrot_param *args)
 #if LOADBALANCE == 1
     int chunk_height = ceil(args->height / (NB_THREADS * NB_TASKS));
     //where to start = partitions computed by previous rounds + my position in this partition
-    int start = (NB_THREADS * round_count * chunk_height ) + (thread->id * chunk_height);
+    int start = (NB_THREADS * task_count[thrd->id] * chunk_height ) + (thrd->id * chunk_height);
     int end = start + chunk_height;
 
 	for (i = start; i < (end < args->height ? end : args->height) ; i++)
@@ -153,10 +155,6 @@ void
 init_round()
 {
 	// Initialize or reinitialize here variables before any thread starts or restarts computation
-#if LOADBALANCE == 1
-    //TODO do this only for one thread or we make one counter per thread??
-    round_count = -1;
-#endif
 }
 
 #if NB_THREADS > 0
@@ -169,7 +167,10 @@ parallel_mandelbrot(struct mandelbrot_thread *args, struct mandelbrot_param *par
 		compute_chunk(parameters);
 	}
 #elif LOADBALANCE == 1
-    compute_chunk(args, parameters);
+    for(task_count[args->id] = 0; task_count[args->id] < NB_TASKS; task_count[args->id]++)
+    {
+        compute_chunk(args, parameters);
+    }
 #endif
 }
 #else
