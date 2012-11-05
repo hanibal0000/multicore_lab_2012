@@ -45,7 +45,7 @@ struct mandelbrot_thread thread_data[NB_THREADS];
 
 /*** altered ***/
 #if LOADBALANCE == 1
-
+// granularity of tasks per thread
 #define NB_TASKS 4
 int round_count;
 
@@ -112,7 +112,8 @@ compute_chunk(struct mandelbrot_param *args)
 	color_t pixel;
 #if LOADBALANCE == 1
     int chunk_height = ceil(args->height / (NB_THREADS * NB_TASKS));
-    int start = (thread->id + 1) * round_count * chunk_height;
+    //where to start = partitions computed by previous rounds + my position in this partition
+    int start = (NB_THREADS * round_count * chunk_height ) + (thread->id * chunk_height);
     int end = start + chunk_height;
 
 	for (i = start; i < (end < args->height ? end : args->height) ; i++)
@@ -153,7 +154,8 @@ init_round()
 {
 	// Initialize or reinitialize here variables before any thread starts or restarts computation
 #if LOADBALANCE == 1
-    round_count++;
+    //TODO do this only for one thread or we make one counter per thread??
+    round_count = -1;
 #endif
 }
 
@@ -304,11 +306,6 @@ init_mandelbrot(struct mandelbrot_param *param)
 
 	// Enables thread running
 	thread_stop = 0;
-
-/*** self defined ***/
-#if LOADBALANCE == 1
-    round_count = -1;
-#endif
 
 #ifdef MEASURE
 	// Measuring record structures
