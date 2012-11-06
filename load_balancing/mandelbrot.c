@@ -131,7 +131,6 @@ has_work_todo(int thread_id)
 void
 find_new_work(int thread_id)
 {
-
     pthread_mutex_lock( &deadlock_preventing_mutex );
 //    int worst_thread_id = -1;
 //    int worst_thread_lines_left=0;
@@ -164,12 +163,19 @@ find_new_work(int thread_id)
     pthread_mutex_unlock( &mutex[victim_id] );
 
     int i = 0;
-    while ( lines_left < 3 && i < 2 ) {
+    while ( lines_left < 3 && i < 3 ) {
         victim_id = rand() % NB_THREADS;
         pthread_mutex_lock( &mutex[victim_id] );
         lines_left = workloads[victim_id].end - workloads[victim_id].pos;
         pthread_mutex_unlock( &mutex[victim_id] );
         i++;
+    }
+    
+    //in the case that we cannot steal from anyone in 2 loop iterations
+    //we have to take care that the last potential victim hasn't been we self
+    if(victim_id == thread_id) {
+        pthread_mutex_unlock( &deadlock_preventing_mutex );
+        return;
     }
 
     pthread_mutex_lock( &mutex[victim_id] );
