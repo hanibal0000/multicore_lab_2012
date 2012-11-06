@@ -56,6 +56,7 @@ struct thread_workload workloads[NB_THREADS];
 
 //mutex for workload access
 pthread_mutex_t mutex[NB_THREADS];
+pthread_mutex_t deadlock_preventing_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 #else
@@ -130,9 +131,11 @@ has_work_todo(int thread_id)
 void
 find_new_work(int thread_id)
 {
-    int worst_thread_id = -1;
-    int worst_thread_lines_left=0;
-    int i;
+
+    pthread_mutex_lock( &deadlock_preventing_mutex );
+//    int worst_thread_id = -1;
+//    int worst_thread_lines_left=0;
+/*    int i;
     for(i = 0; i < NB_THREADS; i++) {
         //skip own thread
         if(i == thread_id)
@@ -143,7 +146,7 @@ find_new_work(int thread_id)
         pthread_mutex_unlock( &mutex[i] );
 
         //new candidate to steal from?
-        if(current_lines_left < 1)
+        if(current_lines_left <= 1)
             continue;
         else
             worst_thread_id = worst_thread_lines_left > current_lines_left ? worst_thread_id : i;
@@ -151,20 +154,37 @@ find_new_work(int thread_id)
 
     if(worst_thread_id == -1)
         return;
-
+*/
     //lock to change work
-    pthread_mutex_lock( &mutex[worst_thread_id] );
+//    pthread_mutex_lock( &deadlock_preventing_mutex );
+    //find random thread to steal from
+    int victim_id = rand() % NB_THREADS;
+    pthread_mutex_lock( &mutex[victim_id] );
+    int lines_left = workloads[victim_id].end - workloads[victim_id].pos;
+    pthread_mutex_unlock( &mutex[victim_id] );
+
+    int i = 0;
+    while ( lines_left < 3 && i < 2 ) {
+        victim_id = rand() % NB_THREADS;
+        pthread_mutex_lock( &mutex[victim_id] );
+        lines_left = workloads[victim_id].end - workloads[victim_id].pos;
+        pthread_mutex_unlock( &mutex[victim_id] );
+        i++;
+    }
+
+    pthread_mutex_lock( &mutex[victim_id] );
     pthread_mutex_lock( &mutex[thread_id] );
     
-    struct thread_workload *workload = &workloads[worst_thread_id];
+    struct thread_workload *workload = &workloads[victim_id];
     workloads[thread_id].end = workload->end;
-    workloads[thread_id].start = workload->pos + floor((workload->end - workload->pos)/2);
+    workloads[thread_id].start = workload->pos + ceil((workload->end - workload->pos)/2);
     workloads[thread_id].pos = workloads[thread_id].start;
     workload->end = workloads[thread_id].start;
 
     //unlock
-    pthread_mutex_unlock( &mutex[worst_thread_id] );
+    pthread_mutex_unlock( &mutex[victim_id] );
     pthread_mutex_unlock( &mutex[thread_id] );
+    pthread_mutex_unlock( &deadlock_preventing_mutex );
 }
 #endif
 
