@@ -113,11 +113,12 @@ compute_chunk(struct mandelbrot_param *args)
 	float Cim, Cre;
 	color_t pixel;
 #if LOADBALANCE == 1
-    int chunk_height = ceil(args->height / (NB_THREADS * NB_TASKS));
+    int chunk_height = ceil((double)args->height / (double)(NB_THREADS * NB_TASKS));
+    printf("computed picture height: %i * %i = %i, %i", chunk_height, NB_THREADS * NB_TASKS, chunk_height * NB_THREADS * NB_TASKS, args->height);
     //where to start = partitions computed by previous rounds + my position in this partition
     int start = (NB_THREADS * task_count[thrd->id] * chunk_height ) + (thrd->id * chunk_height);
     int end = start + chunk_height;
-
+    printf("[Thread: %i]{chunk: %i} start: %i, end %ii\n", thrd->id, task_count[thrd->id], start, end);
 	for (i = start; i < (end < args->height ? end : args->height) ; i++)
 	{
 #else
