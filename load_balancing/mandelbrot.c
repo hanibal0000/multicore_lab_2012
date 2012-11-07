@@ -53,6 +53,7 @@ int task_count[NB_THREADS];
 
 #elif LOADBALANCE == 2
 //representing for every thread what his work is and what he has done
+int currentLine = 0;
 struct thread_workload {
     int start;
     int end;
@@ -121,12 +122,12 @@ is_in_Mandelbrot(float Cre, float Cim, int maxiter)
  *  looks if work for thread is finished or not
  */
 int
-has_work_todo(int thread_id)
+has_work_todo(struct mandelbrot_param* param)
 {
     int ret;
-    pthread_mutex_lock( &mutex[thread_id] );
-    ret = workloads[thread_id].end != workloads[thread_id].pos;
-    pthread_mutex_unlock( &mutex[thread_id] );
+    pthread_mutex_lock(&deadlock_preventing_mutex);
+    ret = currentLine < param->height;
+    pthread_mutex_unlock(&deadlock_preventing_mutex);
     return ret;
 }
 
@@ -136,69 +137,19 @@ has_work_todo(int thread_id)
  * Since we increment the position we are currently performing on before starting to perform
  * (see compute_chunk) we never compute stuff twice, since threads seems finished before being finished
  */
-void
-find_new_work(int thread_id)
+int
+find_new_work(struct mandelbrot_param* param)
 {
-    pthread_mutex_lock( &deadlock_preventing_mutex );
-//    int worst_thread_id = -1;
-//    int worst_thread_lines_left=0;
-/*    int i;
-    for(i = 0; i < NB_THREADS; i++) {
-        //skip own thread
-        if(i == thread_id)
-            continue;
+  int ret = -1;
+  pthread_mutex_lock(&deadlock_preventing_mutex);
+  if(currentLine < param->height)
+  {
+    currentLine = currentLine +1;
+    ret = currentLine;
+  }
+  pthread_mutex_unlock(&deadlock_preventing_mutex);
+  return ret; 
 
-        pthread_mutex_lock( &mutex[i] );
-        int current_lines_left = workloads[i].end - workloads[i].pos;
-        pthread_mutex_unlock( &mutex[i] );
-
-        //new candidate to steal from?
-        if(current_lines_left <= 1)
-            continue;
-        else
-            worst_thread_id = worst_thread_lines_left > current_lines_left ? worst_thread_id : i;
-    }
-
-    if(worst_thread_id == -1)
-        return;
-*/
-    //lock to change work
-//    pthread_mutex_lock( &deadlock_preventing_mutex );
-    //find random thread to steal from
-    int victim_id = rand() % NB_THREADS;
-    pthread_mutex_lock( &mutex[victim_id] );
-    int lines_left = workloads[victim_id].end - workloads[victim_id].pos;
-    pthread_mutex_unlock( &mutex[victim_id] );
-
-    int i = 0;
-    while ( lines_left < 3 && i < 3 ) {
-        victim_id = rand() % NB_THREADS;
-        pthread_mutex_lock( &mutex[victim_id] );
-        lines_left = workloads[victim_id].end - workloads[victim_id].pos;
-        pthread_mutex_unlock( &mutex[victim_id] );
-        i++;
-    }
-    
-    //in the case that we cannot steal from anyone in 2 loop iterations
-    //we have to take care that the last potential victim hasn't been we self
-    if(victim_id == thread_id) {
-        pthread_mutex_unlock( &deadlock_preventing_mutex );
-        return;
-    }
-
-    pthread_mutex_lock( &mutex[victim_id] );
-    pthread_mutex_lock( &mutex[thread_id] );
-    
-    struct thread_workload *workload = &workloads[victim_id];
-    workloads[thread_id].end = workload->end;
-    workloads[thread_id].start = workload->pos + ceil((workload->end - workload->pos)/2);
-    workloads[thread_id].pos = workloads[thread_id].start;
-    workload->end = workloads[thread_id].start;
-
-    //unlock
-    pthread_mutex_unlock( &mutex[victim_id] );
-    pthread_mutex_unlock( &mutex[thread_id] );
-    pthread_mutex_unlock( &deadlock_preventing_mutex );
 }
 #endif
 
@@ -224,13 +175,13 @@ compute_chunk(struct mandelbrot_param *args)
 	for (i = start; i < (end < args->height ? end : args->height) ; i++)
 
 #elif LOADBALANCE == 2
-    pthread_mutex_lock( &mutex[thread_id] );
-    int end = workloads[thread_id].end;
-    i = workloads[thread_id].pos;
-    pthread_mutex_unlock( &mutex[thread_id] );
-    
-    while(i < end)
-        
+    i = find_new_work(args); 
+    if(i==-1)
+    {
+      return;
+    }
+    printf("thread %i is processing line %i \n",thread_id,i);
+
 #else
 	for (i = 0; i < args->height; i++)
 
@@ -263,13 +214,6 @@ compute_chunk(struct mandelbrot_param *args)
 
 #if LOADBALANCE == 2
         //increase position before mutexing
-        i++;
-        
-        //mutexed access to shared workdata
-        pthread_mutex_lock( &mutex[thread_id] );
-        end = workloads[thread_id].end;
-        workloads[thread_id].pos = i;
-        pthread_mutex_unlock( &mutex[thread_id] );
 #endif 
 	}
 }
@@ -319,13 +263,15 @@ parallel_mandelbrot(struct mandelbrot_thread *args, struct mandelbrot_param *par
     }
 
 #elif LOADBALANCE == 2
-    while(has_work_todo(args->id)) 
+    
+    while(has_work_todo(parameters))
     {
         compute_chunk(args->id, parameters);
 
-        find_new_work(args->id);
     }
-
+#if DEBUG
+    printf("Thread %i done computing \n", args->id);
+#endif
 #endif
 }
 #else
@@ -342,6 +288,7 @@ sequential_mandelbrot(struct mandelbrot_param *parameters)
 static void *
 run_thread(void * buffer)
 {
+  printf("threads runnning");
 	struct mandelbrot_thread *args;
 	args = (struct mandelbrot_thread*) buffer;
 
@@ -363,7 +310,7 @@ run_thread(void * buffer)
 #ifdef MEASURE
 		clock_gettime(CLOCK_MONOTONIC, &args->timing.start);
 #endif
-
+  printf("computing!");
 	parallel_mandelbrot(args, &mandelbrot_param);
 
 #ifdef MEASURE
