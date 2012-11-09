@@ -73,7 +73,7 @@ quickbar(2, ...
 	'northeast', 'global_thread_timing_unbalanced.eps', 'epsc'); % location of legend, plot output filename
 
 quickerrorbar(3, ...
-	{globalperf, globalperf_b}, ... % data to be plotted
+	{globalperf, globalperf_2}, ... % data to be plotted
 	1, 2, 3, ... % column for x values then for y values and error
 	{[1 0 0] [1 0 1] [0 0 1] [0 0 0] [0 0.5 0.5]}, ... % colors
 	{'o' '^' '.' 'x' '>' '<'}, ... % markers

@@ -1,0 +1,17 @@
+1. Write a detailed explanation why computation load can be imbalanced and how it affects the global performance.
+Hint: What is necessary to compute a black point or a colored point?
+
+Because it can take from 1 to 256 iterations for one point to calculate, the difference between the workload can be rather high if we evenly distribute the number of points amongst the threads. For example if we have to threads and just split the area by 4 from top to bottom (assuming our interval is symetrically around the mandbrot figure), much more of the two middle areas will be black, than of the outer ones. Therefore it takes them much longer to compute, so we will end up with two threads finished long before the others are, leaving some room for improvement, because the algorithm will be faster, if all threads are under full load and roughly end at the same time.
+
+ Describe a load-balancing method that would help reducing the performance loss due to load-imbalance
+We came up with 3 approaches to this problem
+- work stealing
+	as soon as one thread is finished, it will request more work from other threads which are still computing 
+
+- work pooling
+	try to make many small problems (for example one line of the picture) and let the threads calculate each one line, and when they are finished they will get the next problem
+
+- smaller problem granularity
+	give each thread the same amount of points, but always non-local
+for example thread 1 calculates all points % 4 == 0 thread 2 points % 4 == 1 and so forth
+

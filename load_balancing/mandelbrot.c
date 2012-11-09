@@ -19,6 +19,13 @@
 
 #if NB_THREADS > 0
 #include <pthread.h>
+#endif 
+
+#include<math.h>
+
+#if NB_THREADS == 0
+#undef LOADBALANCE
+#define LOADBALANCE 0
 #endif
 
 int * color = NULL;
@@ -38,6 +45,7 @@ pthread_barrier_t thread_pool_barrier;
 
 pthread_t thread[NB_THREADS];
 struct mandelbrot_thread thread_data[NB_THREADS];
+
 #else
 #ifdef MEASURE
 struct mandelbrot_timing sequential;
@@ -47,6 +55,24 @@ struct mandelbrot_timing sequential;
 #ifdef MEASURE
 struct mandelbrot_timing **timing;
 #endif
+
+
+/*** altered ***/
+#if LOADBALANCE == 1
+// granularity of tasks per thread
+#define NB_TASKS 4
+//array storing for every thread which chunk he is currently up to compute
+//this gets increased by every thread on its own once finished with the old chunk
+int task_count[NB_THREADS];
+
+#elif LOADBALANCE == 2
+//representing for every thread what his work is and what he has done
+int currentLine = 0;
+
+//mutex for workload access
+pthread_mutex_t deadlock_preventing_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
 
 struct mandelbrot_param mandelbrot_param;
 
@@ -86,15 +112,89 @@ is_in_Mandelbrot(float Cre, float Cim, int maxiter)
 }
 
 /***** You may modify this portion *****/
+
+#if LOADBALANCE == 2
+/**
+ *  looks if work for thread is finished or not
+ */
+int
+has_work_todo(struct mandelbrot_param* param)
+{
+    int ret;
+    pthread_mutex_lock(&deadlock_preventing_mutex);
+    ret = currentLine < param->height;
+    pthread_mutex_unlock(&deadlock_preventing_mutex);
+    return ret;
+}
+
+/**
+ * Implementation of work stealing algorithm.
+ * Always steals work from worst performing thread (thread with most work left)
+ * Since we increment the position we are currently performing on before starting to perform
+ * (see compute_chunk) we never compute stuff twice, since threads seems finished before being finished
+ */
+int
+find_new_work(struct mandelbrot_param* param)
+{
+  int ret = -1;
+  pthread_mutex_lock(&deadlock_preventing_mutex);
+  if(currentLine < param->height)
+  {
+    currentLine = currentLine +1;
+    ret = currentLine;
+  }
+  pthread_mutex_unlock(&deadlock_preventing_mutex);
+  return ret; 
+
+}
+#endif
+
+
+#if NB_THREADS != 0 
+static void
+compute_chunk(int thread_id, struct mandelbrot_param *args)
+#else
 static void
 compute_chunk(struct mandelbrot_param *args)
+#endif
 {
 	int i, j, val;
 	float Cim, Cre;
 	color_t pixel;
+#if LOADBALANCE == 0 && NB_THREADS != 0
 
+    int chunk_height = ceil((double)args->height / (double)(NB_THREADS));
+    //where to start = partitions computed by previous rounds + my position in this partition
+    int start = (thread_id * chunk_height);
+    int end = start + chunk_height;
+
+	for (i = start; i < (end < args->height ? end : args->height) ; i++)
+	{
+
+#elif LOADBALANCE == 1 && NB_THREADS != 0
+/*
+    int chunk_height = ceil((double)args->height / (double)(NB_THREADS * NB_TASKS));
+    //where to start = partitions computed by previous rounds + my position in this partition
+    int start = (NB_THREADS * task_count[thread_id] * chunk_height ) + (thread_id * chunk_height);
+    int end = start + chunk_height;
+
+	for (i = start; i < (end < args->height ? end : args->height) ; i++)
+*/
+	for(i=thread_id;i<args->height; i += NB_THREADS) {
+	
+#elif LOADBALANCE == 2 && NB_THREADS != 0
+    i = find_new_work(args); 
+    if(i==-1)
+    {
+      return;
+    }
+
+	{
+
+#else
 	for (i = 0; i < args->height; i++)
 	{
+#endif
 		for (j = 0; j < args->width; j++)
 		{
 			// Convert the coordinate of the pixel to be calculated to both
@@ -119,23 +219,44 @@ compute_chunk(struct mandelbrot_param *args)
 			pixel.blue = val & 255;
 			ppm_write(args->picture, j, i, pixel);
 		}
+
 	}
 }
 
+#if LOADBALANCE == 2
+void
+init_round(struct mandelbrot_thread *args)
+#else
 void
 init_round()
+#endif
 {
 	// Initialize or reinitialize here variables before any thread starts or restarts computation
+#if LOADBALANCE == 2    
+	pthread_mutex_lock( &deadlock_preventing_mutex );
+	currentLine = 0;
+	pthread_mutex_unlock( &deadlock_preventing_mutex );
+#endif
 }
 
 #if NB_THREADS > 0
 void
 parallel_mandelbrot(struct mandelbrot_thread *args, struct mandelbrot_param *parameters)
 {
-	if (args->id == 0)
-	{
-		compute_chunk(parameters);
-	}
+#if LOADBALANCE == 0
+	compute_chunk(args->id, parameters);
+
+#elif LOADBALANCE == 1
+        compute_chunk(args->id, parameters);
+
+#elif LOADBALANCE == 2
+    
+    while(has_work_todo(parameters))
+    {
+        compute_chunk(args->id, parameters);
+
+    }
+#endif
 }
 #else
 void
@@ -158,7 +279,11 @@ run_thread(void * buffer)
 	pthread_barrier_wait(&thread_pool_barrier);
 
 	// Reinitialize vars before any thread restart
+#if LOADBALANCE == 2
+    init_round(args);
+#else
 	init_round();
+#endif
 
 	// Wait for the first computation order
 	pthread_barrier_wait(&thread_pool_barrier);
@@ -168,7 +293,6 @@ run_thread(void * buffer)
 #ifdef MEASURE
 		clock_gettime(CLOCK_MONOTONIC, &args->timing.start);
 #endif
-
 	parallel_mandelbrot(args, &mandelbrot_param);
 
 #ifdef MEASURE
@@ -179,7 +303,11 @@ run_thread(void * buffer)
 		pthread_barrier_wait(&thread_pool_barrier);
 
 		// Reinitialize vars before any thread restart
-		init_round();
+#if LOADBALANCE == 2
+        init_round(args);
+#else
+    	init_round();
+#endif
 
 		// Wait for the next work signal
 		pthread_barrier_wait(&thread_pool_barrier);
