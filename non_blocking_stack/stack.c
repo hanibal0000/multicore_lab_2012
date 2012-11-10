@@ -77,6 +77,7 @@ stack_init(stack_t *stack, size_t size)
 
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
+  pthread_mutex_init(&(stack->mutex),NULL);
 #else
   // Implement a CAS-based stack
 #endif
@@ -95,10 +96,36 @@ stack_check(stack_t *stack)
 int
 stack_push_safe(stack_t *stack, void* buffer)
 {
+
+
+  stack_elem_t* new_elem = (stack_elem_t *) malloc (sizeof(stack_elem_t));
+  new_elem->value = (int *)buffer;
+  
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
+  
+  pthread_mutex_lock(&(stack->mutex));
+  if(stack->head == NULL){
+  		stack->head = new_elem;
+  		stack->head->next = NULL;
+  }else{
+  		new_elem->next = stack->head;
+  		stack->head = new_elem;
+  }
+  	pthread_mutex_unlock(&(stack->mutex));
+  
 #else
-  // Implement a CAS-based stack
+#if NON_BLOCKING == 1
+	//Software CAS-based stack
+#else 
+  // Hardware CAS-based stack
+  stack_elem_t* old;
+  do
+  {
+  	old = stack->head;
+ 	new_elem->next = old;
+  }while(!cas(stack->head, old, new_elem)); 
+#endif
 #endif
 
   return 0;
@@ -109,8 +136,31 @@ stack_pop_safe(stack_t *stack, void* buffer)
 {
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
+  pthread_mutex_lock(&(stack->mutex));
+  if(stack->head == NULL)		//no elements on the stack
+  		;
+  else{	//one ore more elements on the stack
+  		stack_elem_t* temp = stack->head;
+  		stack->head = stack->head->next;
+  		free(temp);
+  }
+  pthread_mutex_unlock(&(stack->mutex));
 #else
-  // Implement a CAS-based stack
+#if NON_BLOCKING == 1
+  	//Software CAS-based stack
+#else
+	//Hardware CAS-stack based stack
+	stack_elem_t* old, *new_head;
+	do{
+		old = stack->head;
+		if(old == NULL)	//no elements on the stack
+			break;
+		else{					//one or more elements on the stack
+			new_head = old->next;
+		}
+	}while(!cas(stack->head,old,new_head));
+	free(old);
+#endif
 #endif
 
   return 0;

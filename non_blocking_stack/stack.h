@@ -27,11 +27,22 @@
 #ifndef STACK_H
 #define STACK_H
 
+
+struct stack_elem
+{
+	int value;
+	struct stack_elem* next;
+};
+typedef struct stack_elem stack_elem_t;
+
 struct stack
 {
-  // This is a fake structure; change it to your needs
-  int change_this_member;
+  stack_elem_t* head;
+  #if NON_BLOCKING == 0
+  pthread_mutex_t mutex;
+  #endif
 };
+
 
 typedef struct stack stack_t;
 
