@@ -31,37 +31,6 @@ global_timing_pop_standard = where(global_timing_pop, [4], {[0]});
 global_timing_pop_soft = where(global_timing_pop, [4], {[1]});
 global_timing_pop_hard = where(global_timing_pop, [4], {[2]});
 
-<<<<<<< HEAD
-quickerrorbar(1,
-	{global_timing_push_standard, global_timing_push_soft, global_timing_push_hard}, % data to be plotted
-	3, 6, 7, % column for x values then for y values and error
-	{[1 0 0] [1 0 1] [0 0 1] [0 0 0] [0 0.5 0.5] [0 0.5 0]}, % colors
-	{"o" "^" "." "x" ">" "<"}, % markers
-	2, 15, "MgOpenModernaBold.ttf", 25, 800, 400, %lines thickness, markers sizes, legend font and size, output bitmap size along x and y
-	"Number of threads employed", "Time in milliseconds", "Time evolution with the number of threads pushing to the same stack",
-	{"Standard lock protection" "Software, lock-based CAS" "hardware CAS"}, % Curves names
-	"northeast", "global_timing_push.eps", "epsc"); % location of legend, plot output filename
-
-quickerrorbar(1,
-	{global_timing_push_standard, global_timing_push_soft, global_timing_push_hard, global_timing_pop_standard, global_timing_pop_soft, global_timing_pop_hard}, % data to be plotted
-	3, 6, 7, % column for x values then for y values and error
-	{[1 0 0] [1 0 1] [0 0 1] [0 0 0] [0 0.5 0.5] [0 0.5 0]}, % colors
-	{"o" "^" "." "x" ">" "<"}, % markers
-	2, 15, "MgOpenModernaBold.ttf", 25, 800, 400, %lines thickness, markers sizes, legend font and size, output bitmap size along x and y
-	"Number of threads employed", "Time in milliseconds", "Time evolution with the number of threads pushing or popping to the same stack",
-	{"Standard lock protection (push)" "Software, lock-based CAS (push)" "hardware CAS (push)" "Standard lock protection (pop)" "Software, lock-based CAS (pop)" "hardware CAS (pop)"}, % Curves names
-	"northeast", "global_timing_both.eps", "epsc"); % location of legend, plot output filename
-
-quickerrorbar(2,
-	{global_timing_pop_standard, global_timing_pop_soft, global_timing_pop_hard}, % data to be plotted
-	3, 6, 7, % column for x values then for y values and error
-	{[1 0 0] [1 0 1] [0 0 1] [0 0 0] [0 0.5 0.5] [0 0.5 0]}, % colors
-	{"o" "^" "." "x" ">" "<"}, % markers
-	2, 15, "MgOpenModernaBold.ttf", 25, 800, 400, %lines thickness, markers sizes, legend font and size, output bitmap size along x and y
-	"Number of threads employed", "Time in milliseconds", "Time evolution with the number of threads popping to the same stack",
-	{"Standard lock protection" "Software, lock-based CAS" "hardware CAS"}, % Curves names
-	"northeast", "global_timing_pop.eps", "epsc"); % location of legend, plot output filename
-=======
 quickerrorbar(1, ...
 	{global_timing_push_standard, global_timing_push_soft, global_timing_push_hard}, ... % data to be plotted
 	3, 6, 7, ... % column for x values then for y values and error
@@ -91,4 +60,3 @@ quickerrorbar(2, ...
 	'Number of threads employed', 'Time in milliseconds', 'Time evolution with the number of threads popping to the same stack', ...
 	{'Standard lock protection' 'Software, lock-based CAS' 'hardware CAS'}, ... % Curves names
 	'northeast', 'global_timing_pop.eps', 'epsc'); % location of legend, plot output filename
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17

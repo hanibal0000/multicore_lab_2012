@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <stddef.h>
 
 #include "stack.h"
 #include "non_blocking.h"
@@ -117,7 +118,7 @@ test_aba()
 struct thread_test_cas_args
 {
   int id;
-  int* counter;
+  size_t* counter;
   pthread_mutex_t *lock;
 };
 typedef struct thread_test_cas_args thread_test_cas_args_t;
@@ -126,18 +127,15 @@ void*
 thread_test_cas(void* arg)
 {
   thread_test_cas_args_t *args = (thread_test_cas_args_t*) arg;
-  int i, old, local;
+  int i;
+  size_t old, local;
 
   for (i = 0; i < MAX_PUSH_POP; i++)
     {
-      old = *args->counter;
-      local = *args->counter + 1;
-
-      while (cas((void**)&args->counter, (void*)&old, (void*)&local) != (void*)&old)
-        {
-          old = *args->counter;
-          local = *args->counter + 1;
-        }
+      do {
+        old = *args->counter;
+        local = old + 1;
+      } while (cas(args->counter, old, local) != old);
     }
 
   return NULL;
@@ -146,18 +144,20 @@ thread_test_cas(void* arg)
 int
 test_cas()
 {
+#if 1
   pthread_attr_t attr;
   pthread_t thread[NB_THREADS];
   thread_test_cas_args_t args[NB_THREADS];
   pthread_mutexattr_t mutex_attr;
   pthread_mutex_t lock;
 
-  int counter;
+  size_t counter;
 
   int i, success;
 
   counter = 0;
   pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE); 
   pthread_mutexattr_init(&mutex_attr);
   pthread_mutex_init(&lock, &mutex_attr);
 
@@ -174,16 +174,32 @@ test_cas()
       pthread_join(thread[i], NULL);
     }
 
-  success = counter == NB_THREADS * MAX_PUSH_POP;
+  success = counter == (size_t)(NB_THREADS * MAX_PUSH_POP);
 
   if (!success)
     {
-      printf("Got %i, expected %i\n", counter, NB_THREADS * MAX_PUSH_POP);
+      printf("Got %ti, expected %i\n", counter, NB_THREADS * MAX_PUSH_POP);
     }
 
   assert(success);
 
   return success;
+#else
+  int a, b, c, *a_p, res;
+  a = 1;
+  b = 2;
+  c = 3;
+
+  a_p = &a;
+
+  printf("&a=%X, a=%d, &b=%X, b=%d, &c=%X, c=%d, a_p=%X, *a_p=%d; cas returned %d\n", (unsigned int)&a, a, (unsigned int)&b, b, (unsigned int)&c, c, (unsigned int)a_p, *a_p, (unsigned int) res);
+
+  res = cas((void**)&a_p, (void*)&c, (void*)&b);
+
+  printf("&a=%X, a=%d, &b=%X, b=%d, &c=%X, c=%d, a_p=%X, *a_p=%d; cas returned %X\n", (unsigned int)&a, a, (unsigned int)&b, b, (unsigned int)&c, c, (unsigned int)a_p, *a_p, (unsigned int)res);
+
+  return 0;
+#endif
 }
 
 // Stack performance test
@@ -200,6 +216,7 @@ struct timespec t_start[NB_THREADS], t_stop[NB_THREADS], start, stop;
 int
 main(int argc, char **argv)
 {
+setbuf(stdout, NULL);
 // MEASURE == 0 -> run unit tests
 #if MEASURE == 0
   test_init();

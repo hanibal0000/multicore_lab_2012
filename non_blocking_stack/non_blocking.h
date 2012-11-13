@@ -21,20 +21,20 @@
  * 
  */
 
-
+#include <stddef.h>
 
 #ifndef NON_BLOCKING_H_
 #define NON_BLOCKING_H_
 
-// Alias for 32 bits CAS
+// Alias for pointer-sized CAS
 #define cas(reg, old, new) cas(reg, old, new)
 
-void* cas(void**, void*, void*);
+size_t cas(size_t*, size_t, size_t);
 
 #if NON_BLOCKING == 1
 #include <pthread.h>
 
-void* software_cas(void**, void*, void*, pthread_mutex_t*);
+size_t software_cas(size_t *, size_t, size_t, pthread_mutex_t*);
 #endif
 
 #endif /* NON_BLOCKING_H_ */

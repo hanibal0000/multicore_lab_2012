@@ -25,6 +25,8 @@
 #define NDEBUG
 #endif
 
+#include <stddef.h>
+
 #if NON_BLOCKING == 0 || NON_BLOCKING == 1
 #include <pthread.h>
 #endif
@@ -32,8 +34,8 @@
 #if NON_BLOCKING == 1
 #include <string.h>
 
-inline void*
-software_cas(void** reg, void* oldval, void* newval, pthread_mutex_t *lock)
+inline size_t
+software_cas(size_t* reg, size_t oldval, size_t newval, pthread_mutex_t *lock)
 {
   // Implement lock-based cas yourself
 }
@@ -41,8 +43,8 @@ software_cas(void** reg, void* oldval, void* newval, pthread_mutex_t *lock)
 
 #if defined i386 || __i386__ || __i486__ || __i586__ || __i686__ || __i386 || __IA32__ || _M_IX86 || _M_IX86 || __X86__ || _X86_ || __THW_INTEL__ || __I86__ || __INTEL__ || __x86_64 || __x86_64__
 
-void*
-cas(void** reg, void* oldval, void* newval)
+inline size_t
+cas(size_t* reg, size_t oldval, size_t newval)
 {
   /*int out;
 
@@ -56,19 +58,23 @@ cas(void** reg, void* oldval, void* newval)
 
   return out;*/
 
+#if 0
+  //return __sync_val_compare_and_swap(reg, oldval, newval);
+#else
   asm volatile( "lock; cmpxchg %2, %1":
                 "=a"(oldval):
                 "m"(*reg), "r"(newval), "a"(oldval):
                 "memory" );
 
   return oldval;
+#endif
 }
 
 #else
 #ifdef __GNUC__
 
-inline void*
-cas(void** reg, void* oldval, void* newval)
+inline size_t
+cas(size_t* reg, size_t oldval, size_t newval)
 {
   return __sync_val_compare_and_swap(reg, oldval, newval);
 }
@@ -76,8 +82,8 @@ cas(void** reg, void* oldval, void* newval)
 #else
 
 #warning Unsupported compiler and architecture; no CAS available
-inline void*
-cas(int* reg, int oldval, int newval)
+inline size_t
+cas(size_t* reg, size_t oldval, size_t newval)
 {
   return 0;
 }

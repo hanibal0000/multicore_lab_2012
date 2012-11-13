@@ -24,10 +24,7 @@ log()
 
 run()
 {
-<<<<<<< HEAD
-=======
 #	log "[CMD] " "$@"
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 	$@
 }
 
@@ -62,21 +59,10 @@ cut_head()
 	echo \(`echo $@|cut -f 1 -d ' ' --complement`\)
 }
 
-<<<<<<< HEAD
-get_date()
-{
-	echo `date +%D\ %R:%S`
-}
-
-build_args()
-{
-	# $1 is the variable containing the list of variables to be listed
-=======
 build_args()
 {
 	# $1 is the variable containing the list of variables to be listed
 	# build_args `eval cut_head ${1[@]}`|while read tail; do echo ${1[1]}\ $tail; done
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 	eval myvars=\(`echo $@`\)
 	eval next_step=`cut_head ${myvars[@]}`
 	var=${myvars[0]}
@@ -111,17 +97,10 @@ merge_data()
 {
 	info Merging all results of the same experiment together
 
-<<<<<<< HEAD
-	echo $HEADER > $data$ext
-	echo %\ ${compile[@]}\ ${run[@]}\ $output >> $data$ext
-	cat data-$experiment-*.m|grep -v %|grep -v function >> $data$ext
-	echo $FOOTNOTE >> $data$ext
-=======
 	echo -e $HEADER > $data$ext
 	echo %\ ${compile[@]}\ ${run[@]}\ $output >> $data$ext
 	cat data-$experiment-*.m|grep -v %|grep -v function|grep -v ^x|grep -v end|grep -v ']' >> $data$ext
 	echo -e $FOOTNOTE >> $data$ext
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 }
 
 compile()
@@ -130,28 +109,12 @@ compile()
 	info Will compile $total_instances settings
 
 	compile_counter=1
-<<<<<<< HEAD
-	total_time=0
-=======
 	compile_success=0
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 	start_time=`date +%s`
 	build_args ${compile[@]}|while read args; do
 		info_start Setting $compile_counter/$total_instances: `for i in $(seq 0 $((${#compile[@]} - 1)));do echo "${compile[$i]}=$(echo $args|cut -d ' ' -f $(($i + 1)))"; done`"... "
 		instance_start=`date +%s`
 		bash ./compile $args 2>&1 > /dev/null
-<<<<<<< HEAD
-		instance_stop=`date +%s`
-		compile_time=$(($instance_stop - $instance_start))
-		total_time=$(($total_time + $compile_time))
-		remaining=$((($total_instances - $compile_counter) * ($total_time / $compile_counter)))
-		info_stop $compile_time sec finished on $(echo -n `get_date`)\; approx. $remaining sec left \($(($remaining / 60)) minutes, $(($remaining / 60 / 60)) hours, $(($remaining / 60 / 60 / 24)) days\)
-		compile_counter=$(($compile_counter + 1))
-	done
-	stop_time=`date +%s`
-	overall_time=$(($stop_time - start_time))
-	info Compilation took $overall_time seconds \($(($overall_time / 60)) minutes or $(($overall_time / 60 / 60)) hours\) or $(($overall_time / $total_instances)) seconds per compilation setting \($(($overall_time / $total_instances / 60)) minutes or $(($overall_time / $total_instances / 60 / 60)) hours\).
-=======
 		success=$?
 
 		instance_stop=`date +%s`
@@ -184,17 +147,12 @@ compile()
 	info $compile_outcome. Compilation took $overall_time seconds \($(($overall_time / 60)) minutes or $(($overall_time / 60 / 60)) hours\) or $(($overall_time / $total_instances)) seconds per compilation setting \($(($overall_time / $total_instances / 60)) minutes or $(($overall_time / $total_instances / 60 / 60)) hours\).
 
 	return $compile_success
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 }
 
 batch()
 {
 	run_instances=`count_args ${run[@]}`
 	compile_instances=`count_args ${compile[@]}`
-<<<<<<< HEAD
-
-=======
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 	total_instances=$(($run_instances * $compile_instances))
 
 	info Will run $total_instances instances
@@ -202,19 +160,6 @@ batch()
 	# Initialize output file
 	start_time=`date +%s`
 	filename=$data-$experiment-`date|tr ' ' _|tr : -`$ext
-<<<<<<< HEAD
-	echo $HEADER > $filename
-	echo %\ ${compile[@]}\ ${run[@]}\ $output >> $filename
-
-	compile_counter=0
-	build_args ${compile[@]}|while read flags; do
-		run_counter=1	
-		total_time=0
-		build_args ${run[@]}|while read args; do
-			already_run=$((compile_counter * $run_instances + $run_counter))
-			info_start Instance $already_run/$total_instances: `for i in $(seq 0 $((${#compile[@]} - 1)));do echo "${compile[$i]}=$(echo $flags|cut -d ' ' -f $(($i + 1))) "; done``for i in $(seq 0 $((${#run[@]} - 1)));do echo "${run[$i]}=$(echo $args|cut -d ' ' -f $(($i + 1)))"; done`"... "
-			instance_start=`date +%s`
-=======
 	echo -e $HEADER > $filename
 	echo %\ ${compile[@]}\ ${run[@]}\ $output >> $filename
 
@@ -228,31 +173,11 @@ batch()
 			info_start Instance $((compile_counter * $run_instances + $run_counter))/$total_instances: `for i in $(seq 0 $((${#compile[@]} - 1)));do echo "${compile[$i]}=$(echo $flags|cut -d ' ' -f $(($i + 1))) "; done``for i in $(seq 0 $((${#run[@]} - 1)));do echo "${run[$i]}=$(echo $args|cut -d ' ' -f $(($i + 1)))"; done`"... "
 			instance_start=`date +%s`
 			file_size=$(cat $filename|wc -l)
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 			bash ./run $flags $args|while read line;
 			do
 				# Add content to output file
 				echo $flags $args $line >> $filename
 			done
-<<<<<<< HEAD
-			instance_stop=`date +%s`
-			run_time=$(($instance_stop - $instance_start))
-			total_time=$(($total_time + $run_time))
-			remaining=$((($total_instances - $already_run) * ($total_time / $run_counter)))
-
-			info_stop $run_time sec finished on $(echo -n `get_date`)\; approx. $remaining sec left \($(($remaining / 60)) minutes, $(($remaining / 60 / 60)) hours, $(($remaining / 60 / 60 / 24)) days\)
-
-			run_counter=$(($run_counter + 1))
-		done
-		compile_counter=$(($compile_counter + 1))
-	done
-
-	# Finalize output file
-	echo $FOOTNOTE >> $filename
-	stop_time=`date +%s`
-	overall_time=$(($stop_time - start_time))
-	info Instances took $overall_time seconds \($(($overall_time / 60)) minutes or $(($overall_time / 60 / 60)) hours\) to run, or $(($overall_time / $total_instances)) seconds per instance run \($(($overall_time / $total_instances / 60)) minutes or $(($overall_time / $total_instances / 60 / 60)) hours\).
-=======
 			
 			success=${PIPESTATUS[0]}
 			if [ "x$success" == "x0" ]; then
@@ -307,7 +232,6 @@ batch()
 	info $batch_outcome. Instances took $overall_time seconds \($(($overall_time / 60)) minutes or $(($overall_time / 60 / 60)) hours\) to run, or $(($overall_time / $total_instances)) seconds per instance run \($(($overall_time / $total_instances / 60)) minutes or $(($overall_time / $total_instances / 60 / 60)) hours\).
 
 	return $batch_success
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 }
 
 operation=$1
@@ -319,11 +243,7 @@ case "x$operation" in
 	"xcompile")
 		compile
 
-<<<<<<< HEAD
-		exit 0
-=======
 		exit $?
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 	;;
 	"xrun")
 		if [ "x$experiment" == "x" ];
@@ -333,32 +253,12 @@ case "x$operation" in
 			exit 1
 		else
 			batch
-<<<<<<< HEAD
-			merge_data
-
-			exit 0
-		fi
-	;;
-	"xmerge")
-		if [ "x$experiment" == "x" ];
-		then
-			error You must name the experiment to be run
-			usage
-			exit 1
-		else
-			merge_data
-
-			exit 0
-		fi
-	;;		
-=======
 			batch_success=$?
 			merge_data
 
 			exit $batch_success
 		fi
 	;;
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 	*)
 		error Unknown operation
 		usage

@@ -1,7 +1,5 @@
 #!/bin/bash -f
 
-<<<<<<< HEAD
-=======
 #     Copyright 2011 Nicolas Melot
 # 
 #    Nicolas Melot (nicolas.melot@liu.se)
@@ -20,16 +18,10 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
 logfile=log
 
 data=data
 ext=.m
 
-<<<<<<< HEAD
-HEADER="function x = data() x = ["
-FOOTNOTE="]; endfunction"
-=======
 HEADER="function x = data()\\nx = ["
 FOOTNOTE="];\\nend"
->>>>>>> c0bef48c3a77c329f9c95af7205b801b9f61ba17
