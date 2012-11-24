@@ -71,7 +71,7 @@ array_prealloc()
   {
     struct array* array;
 
-    array = malloc(sizeof(int));
+    array = malloc(sizeof(struct array));
     assert(array != NULL);
 
     array->length = 0;
