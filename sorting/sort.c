@@ -47,7 +47,6 @@ typedef struct array array_t;
 typedef struct thread_data {
 
     int id;
-    array_t *to_sort;
 
 } thread_data_t;
 
@@ -60,8 +59,11 @@ array_t *splitter_candidates;
 
 array_t *partitioning_lists[NB_THREADS];
 
+pthread_barrier_t sync_barrier;
+
 int n_splitters;
 int picked_splitters;
+int sorted_bitmap[NB_THREADS];
 #endif
 
 /*
@@ -234,15 +236,64 @@ quicksort(int low, int high, array_t * array)
  * parallel code
  */
 
+    void
+par_check_sorted(int id, array_t *to_check)
+{
+    int chunk_size = ceil((double)(to_check->length) / (double)NB_THREADS);
 
-   void 
-pick_splitters()
+    int start = id * chunk_size;
+    int end;
+    if(id = NB_THREADS - 1)
+        end = to_check->length;
+    else
+        end = start + chunk_size + 1;
+
+    int i = start + 1;
+    int prev = array_get(to_sort, start);
+    int now;
+    for(i = start + 1; i<end; i++)
+    {
+        now = array_get(to_check, i);
+        if(prev > now)
+        {
+            ret = 0;
+            break;
+        }
+        prev = now;
+    }
+
+    sorted_bitmap[id] = ret;
+}
+
+    void
+par_partition(int id)
+{
+    int chunk_size = ceil((double)(to_check->length) / (double)NB_THREADS);
+
+    int start = id * chunk_size;
+    int end;
+    if(id = NB_THREADS - 1)
+        end = to_check->length;
+    else
+        end = start + chunk_size;
+
+    int i, j, data;
+    for(i = start; i<end; i++)
+    {
+        data = array_get(global_array, i);
+		j = binarySearch(splitters, data);
+        array_put(splitter_lists[id][j], data);
+    }
+}
+
+    void 
+par_pick_splitters()
 {
 
 	int nb_splitter_candidates = sqrt(global_array->length);
 	int priv_pick_count;
 	int pos;
-	for(priv_pick_count=0; priv_pick_count < nb_splitter_candidates; priv_pick_count++)
+	for((priv_pick_count = __sync_fetch_and_add(&splitter_pick_count, 1)) < nb_splitter_candidates)
 	{
 	        //compute random position in the range
 		pos = random() % global_array->length;
@@ -251,40 +302,98 @@ pick_splitters()
 		array_insert(splitter_candidates,
 			array_get(global_array, pos),
 			priv_pick_count);
-
 	}
-
-	quicksort(0, nb_splitter_candidates -1, splitter_candidates);
-
-	int jump = nb_splitter_candidates / NB_THREADS;
-	pos = jump;
-	int i;
-	for(i=0; i<NB_THREADS - 1; i++) {
-		array_put(splitters,
-			array_get(splitter_candidates, pos)
-		);
-		
-		pos = pos + jump;
-	}
-/*
-int i = 0;
-
-for(i=0;i<n_splitters;i++)
-    array_put(splitters,
-	array_get(global_array,random()%global_array->length));
-for(i=1;i<=n_splitters;i++)
-    array_put(splitters,
-	array_get(global_array,global_array->length/i));
-    return 0;
-*/
 }
 
 	static void*
 run_thread(void* buffer) 
 {
+    thread_data_t t_data = (thread_data_t *)buffer;
+    int id = t_data->id;
 
-	thread_data_t *data = (thread_data_t *)buffer;
-	array_t *to_sort = data->to_sort;
+    //check if array is sorted in parallel
+    par_check_sorted(id, global_array);
+
+    //wait for all to check
+    pthread_barrier_wait(&sync_barrier);
+
+    //check if sorted
+    int ret = 1;
+    int i;
+    for(i = 0; i<NB_THREADS; i++)
+    {
+        if(!sorted_bitmap[i])
+        {
+            ret = 0;
+            break;
+        }
+    }
+
+    //if sorted we are finished
+    if(ret)
+        return;
+
+    //pick splitter candidates in parallel
+    par_pick_splitters(id);
+
+    //wait for all to pick
+    pthread_barrier_wait(&sync_barrier);
+
+    //one thread sorts them and decides which ones to pick
+    if(id = NB_THREADS - 1) 
+    {
+	    quicksort(0, nb_splitter_candidates -1, splitter_candidates);
+
+	    int jump = nb_splitter_candidates / NB_THREADS;
+	    pos = jump;
+	    for(i=0; i<NB_THREADS - 1; i++) {
+		    array_put(splitters,
+			    array_get(splitter_candidates, pos)
+		    );
+		
+		    pos = pos + jump;
+	    }
+    }
+
+    //wait for splitters
+    pthread_barrier_wait(&sync_barrier);
+
+    par_partition(id);
+
+    pthread_barrier_wait(&sync_barrier);
+
+    //compute position
+    int i,j;
+    int global_pos = 0;
+    for(i = 0; i<NB_THREADS; i++)
+    {
+        for(j=0;j<id;j++)
+        {
+            pos += partitioning_arrays[i][j];
+        }
+    }
+
+    //length of the array i have to sort
+    int length = 0;
+    for(i=0;i<NB_THREADS;i++)
+    {
+        length += partitioning_arrays[i][id]->length;
+    }
+
+
+    //compute array
+    array_t *to_sort = array_alloc(length);
+    for(i=0;i<NB_THREADS;i++)
+    {
+        for(j=0;j<partitioning_arrays[i][id]->length; j++)
+        {
+            array_put(to_sort,
+                    array_get(partitioning_array[i][id], j)
+                );
+        }
+    }
+
+    //sort
 	int i;
 	array_t *helper_array = array_alloc(to_sort->length);
 	for(i=0;i<to_sort->length;i++)
@@ -293,6 +402,13 @@ run_thread(void* buffer)
 	}
 
 	mergeSort(0, to_sort->length - 1, helper_array, to_sort);
+
+    for(i=0;i<to_sort->length;i++)
+    {
+        array_insert(global_array,
+                array_get(to_sort, i),
+                global_pos + i);
+    }
 
 	return NULL;
 }
@@ -336,25 +452,16 @@ sort(struct array * array)
 		int i, j;
 		for(i = 0; i< NB_THREADS; i++) 
 		{
-			//allocate worst case space which is size of all elements
-			//partitioned by one thread in every list
-			partitioning_lists[i] =  
-				array_alloc(array->length);
+            for(j = 0; j<NB_THREADS; j++)
+            {
+			    //allocate worst case space which is size of all elements
+			    //partitioned by one thread in every list
+			    partitioning_lists[i][j] =  
+				    array_alloc(ceil((double)array->length/(double)NB_THREADS));
+            }
 		}
 
-
-
-		pick_splitters();
-
-		int end_pos = global_array->length;
-		//put own share into corresponding splitter stacks
-		for(i= 0; i < end_pos; i++) 
-		{
-			j=binarySearch(splitters, global_array->data[i]);
-
-			array_put(partitioning_lists[j], global_array->data[i]);
-		}
-
+        pthread_barrier_init(&sync_barrier, NULL);
 
 		//init threads
 		pthread_attr_t pthread_attr;
@@ -367,7 +474,6 @@ sort(struct array * array)
 		for(i = 0; i < NB_THREADS; i++) 
 		{
 			thread_data[i].id = i;
-			thread_data[i].to_sort = partitioning_lists[i];
 			pthread_create(&thread[i], &pthread_attr, &run_thread, &thread_data[i]);
 		}
 
