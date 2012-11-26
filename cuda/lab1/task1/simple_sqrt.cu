@@ -33,7 +33,7 @@ int main()
         elem = pow(elem, 2);
     }
 
-    cudaMemcpy( orig, cd, size, cudaMemcpyHostToDevice );
+    cudaMemcpy( cd, orig, size, cudaMemcpyHostToDevice );
 	dim3 dimBlock( blocksize, 1 );
 	dim3 dimGrid( 1, 1 );
 	simple<<<dimGrid, dimBlock>>>(cd);

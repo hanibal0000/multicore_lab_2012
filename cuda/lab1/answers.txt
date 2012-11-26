@@ -1,0 +1,29 @@
+Task 1:
+    1.1 How many cores will simple.cu use, max, as written?
+
+    1.2 Is the calculated square root identical to what the CPU calculates? 
+
+    1.3 Should we asume that this is always the case? 
+
+Task 2:
+    2.1 How do you calculate the index in the array, using 2-dimensional blocks?
+
+    2.2 What happens if you use too many threads per block?
+
+    2.3 At what data size is the GPU faster than the CPU?
+
+    2.4 What Block size seems a good choice compared to what?
+
+    2.5 Write down your data size, block size and timing data for the best GPU performance you can get.
+
+    2.6 How much performance did you lose by making data accesses non-coalesced?
+
+Task 3:
+    3.1 What was the problem?
+        The problem was a bad choice of the grid and block dimensions.
+        For every computation unit a different Block was used with dimensions 1x1.
+
+    3.2 How did you correct it?
+        Adapting the Grid dimensions. Using less blocks with more threads in each block.
+
+    3.3 What speedup did you get?
